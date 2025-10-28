@@ -1,0 +1,63 @@
+# Mimir Requirements - Based on Moshi + Integrations
+# Install with: pip install -r requirements-mimir.txt
+
+# ========================================
+# MOSHI BASE DEPENDENCIES (manteniamo)
+# ========================================
+einops==0.7.0
+safetensors==0.4.4
+sentencepiece==0.2.0
+sounddevice==0.5.0
+soundfile==0.12.1
+sphn==0.1.4  # Opus codec for audio streaming
+torch==2.2.0
+numpy==1.26.4
+aiohttp>=3.10.5, <3.11
+huggingface-hub>=0.24, <0.34
+
+# ========================================
+# MIMIR INTEGRATIONS - NEW
+# ========================================
+
+# Ollama Client
+ollama==0.1.6
+requests==2.31.0
+
+# Whisper ASR
+openai-whisper==20231117
+# Note: torch già incluso sopra
+
+# XTTS v2 (Coqui TTS)
+TTS==0.22.0
+pydub==0.25.1
+librosa==0.10.1
+
+# ========================================
+# ADDITIONAL UTILITIES
+# ========================================
+pyyaml==6.0.1
+python-dotenv==1.0.0
+colorlog==6.8.0
+tqdm==4.66.1
+
+# Database for memory
+sqlalchemy==2.0.23
+
+# Performance
+psutil==5.9.6
+
+# ========================================
+# DEVELOPMENT (optional)
+# ========================================
+pytest==7.4.3
+black==23.12.1
+flake8==6.1.0
+
+# ========================================
+# NOTES
+# ========================================
+# - torch 2.2.0 è compatibile con Whisper e TTS
+# - sphn fornisce Opus codec per streaming (già in Moshi)
+# - aiohttp per WebSocket server/client (già in Moshi)
+# - Installazione: pip install -r requirements-mimir.txt
+# - Tempo stimato: 10-15 minuti
