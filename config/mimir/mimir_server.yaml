@@ -37,7 +37,7 @@ xtts:
   language: "it"
   
   # Voice cloning
-  speaker_wav: "./data/voice_models/mimir_voice_fixed.wav"
+  speaker_wav: "./data/voice_models/mimir_voice_1hour.wav"
   use_custom_voice: true
   
   # Quality

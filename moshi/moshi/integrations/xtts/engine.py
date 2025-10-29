@@ -29,18 +29,20 @@ class XTTSConfig:
     speaker_wav: Optional[str] = None  # Path al file audio per cloning
     use_custom_voice: bool = False
     
-    # Quality settings
+    # Quality settings (OTTIMIZZATI per voice cloning)
     sample_rate: int = 22050  # XTTS output sample rate
     speed: float = 1.0  # Velocità parlato (0.5-2.0)
-    temperature: float = 0.75  # Creatività (0.0-1.0)
+    temperature: float = 0.65  # ← RIDOTTO per più coerenza (era 0.75)
     length_penalty: float = 1.0
-    repetition_penalty: float = 2.0
+    repetition_penalty: float = 5.0  # ← AUMENTATO per evitare ripetizioni (era 2.0)
     top_k: int = 50
     top_p: float = 0.85
     
-    # Streaming
-    enable_text_splitting: bool = True  # Split testo lungo in frasi
-    stream_chunk_size: int = 20  # Caratteri per chunk streaming
+    # Voice cloning quality (NUOVO)
+    enable_text_splitting: bool = True
+    gpt_cond_len: int = 30  # Lunghezza conditioning (più alto = più simile alla voce)
+    gpt_cond_chunk_len: int = 4  # Chunk size per conditioning
+    max_ref_length: int = 60  # Max secondi reference audio da usare
 
 
 class XTTSEngine:
@@ -174,33 +176,38 @@ class XTTSEngine:
             loop = asyncio.get_event_loop()
             
             if self.config.use_custom_voice and self._speaker_wav_loaded:
-                # Voice cloning con file speaker
+                # Voice cloning con file speaker - Approccio corretto per XTTS v2
+                logger.info(f"Voice cloning con: {self.config.speaker_wav}")
+                
                 wav = await loop.run_in_executor(
                     None,
                     lambda: self.tts.tts(
                         text=text,
                         language=self.config.language,
-                        speaker_wav=self.config.speaker_wav
+                        speaker_wav=self.config.speaker_wav,
+                        # XTTS non accetta questi parametri in voice cloning mode
+                        # temperature=self.config.temperature,
+                        # length_penalty=self.config.length_penalty,
                     )
                 )
             else:
-                # Per XTTS multi-speaker, usa uno speaker default
-                # Lista speakers disponibili
+                # Prova con speaker di default se multi-speaker
                 speakers = self.tts.speakers if hasattr(self.tts, 'speakers') else []
                 
                 if speakers and len(speakers) > 0:
                     # Usa primo speaker disponibile
+                    logger.info(f"Usando speaker: {speakers[0]}")
                     wav = await loop.run_in_executor(
                         None,
                         lambda: self.tts.tts(
                             text=text,
                             language=self.config.language,
-                            speaker=speakers[0]  # Usa speaker default
+                            speaker=speakers[0]
                         )
                     )
                 else:
-                    # Fallback: genera audio semplice
-                    logger.warning("Nessuno speaker disponibile, usando sintesi base")
+                    # Ultimo tentativo: sintesi senza speaker
+                    logger.warning("Tentativo sintesi senza speaker specificato")
                     wav = await loop.run_in_executor(
                         None,
                         lambda: self.tts.tts(
@@ -334,10 +341,12 @@ async def test_xtts():
     """Test XTTS engine"""
     print("=== Test XTTS Engine ===\n")
     
+    # ⚠️ IMPORTANTE: Abilita voice cloning
     config = XTTSConfig(
         language="it",
         device="cpu",
-        use_custom_voice=False  # Usa voce default per test
+        use_custom_voice=True,  # ← ABILITATO
+        speaker_wav="./data/voice_models/mimir_voice_1hour.wav"  # ← PATH FILE
     )
     
     engine = XTTSEngine(config)
@@ -377,7 +386,7 @@ async def test_streaming():
         language="it",
         device="cpu",
         use_custom_voice=True,  # ← ABILITATO
-        speaker_wav="./data/voice_models/mimir_voice_master.wav"  # ← PATH FILE
+        speaker_wav="./data/voice_models/mimir_voice_1hour.wav"  # ← PATH FILE
     )
     
     engine = XTTSEngine(config)
