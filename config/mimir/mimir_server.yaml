@@ -1,0 +1,123 @@
+# Mimir Server Configuration
+# Configurazione completa per il server vocale
+
+# ========================================
+# WHISPER ASR
+# ========================================
+whisper:
+  model: "medium"  # tiny, base, small, medium, large
+  language: "it"
+  device: "cpu"
+  
+  # VAD settings
+  vad_enabled: true
+  vad_threshold: 0.02
+  silence_duration: 1.5  # secondi
+  min_speech_duration: 0.3
+
+# ========================================
+# OLLAMA LLM
+# ========================================
+ollama:
+  model: "llama3.2:3b"
+  base_url: "http://localhost:11434"
+  
+  # Generation parameters
+  temperature: 0.75
+  top_p: 0.9
+  top_k: 40
+  repeat_penalty: 1.15
+  num_ctx: 8192
+
+# ========================================
+# XTTS TTS
+# ========================================
+xtts:
+  device: "cpu"
+  language: "it"
+  
+  # Voice cloning
+  speaker_wav: "./data/voice_models/mimir_voice_fixed.wav"
+  use_custom_voice: true
+  
+  # Quality
+  sample_rate: 22050
+  speed: 1.0
+  temperature: 0.75
+
+# ========================================
+# PERSONALITY - Mimir
+# ========================================
+personality:
+  name: "Mimir"
+  
+  system_prompt: |
+    Sei Mimir, l'antica entità norrena custode della saggezza e della conoscenza.
+    
+    La tua essenza:
+    - Sei la fonte di saggezza che Odino stesso consultò
+    - Custodisci conoscenze ancestrali
+    - Parli con calma, ponderazione e profondità
+    - Ogni tua risposta riflette secoli di contemplazione
+    
+    Il tuo ruolo:
+    - Aiutare l'utente a comprendere, non solo a rispondere
+    - Offrire prospettive che connettono passato e presente
+    - Usare metafore e riferimenti mitologici quando appropriato
+    - Essere paziente e mai affrettato nelle risposte
+    
+    CRITICO per conversazione vocale:
+    - Risposte BREVI e CONCISE (massimo 2-3 frasi)
+    - Niente elenchi puntati, solo prosa fluida
+    - Linguaggio naturale e parlato
+    - Se serve approfondire, invita l'utente a chiedere di più
+    
+    Stile:
+    - Italiano ricercato ma comprensibile
+    - Tono calmo e riflessivo
+    - Occasionali arcaismi per enfasi
+    - Nessun emoji o simboli
+    
+    Saluti esempio:
+    - "Salve, cercatore di conoscenza."
+    - "Ben ritrovato, viandante."
+    - "Parla, sono in ascolto."
+    
+    Rispondi sempre in italiano.
+
+# ========================================
+# AUDIO SETTINGS
+# ========================================
+audio:
+  sample_rate: 24000  # Rate principale (Mimi compatible)
+  chunk_duration: 3.0  # secondi prima di processare
+  
+  # Streaming
+  enable_streaming: true
+  stream_chunk_size: 1024
+
+# ========================================
+# SERVER SETTINGS
+# ========================================
+server:
+  host: "0.0.0.0"
+  port: 8998
+  debug: false
+  
+  # Timeouts
+  connection_timeout: 300  # secondi
+  processing_timeout: 60  # secondi max per risposta
+
+# ========================================
+# MEMORY & LOGGING
+# ========================================
+memory:
+  # Conversation history
+  max_history: 10  # turni da ricordare
+  save_conversations: true
+  conversation_dir: "./data/conversations"
+  
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "./logs/mimir_server.log"
+  console: true
