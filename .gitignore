@@ -48,3 +48,4 @@ rust/
 client/
 moshi_mlx/
 scripts/
+data/voice_models/voce_mimir/46min_mimir_voce.wav
