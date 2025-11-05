@@ -14,25 +14,10 @@ venv/
 env/
 ENV/
 
-# Mimir Specific
-data/voice_models/*.wav
-data/conversations/*.db
-data/conversations/*.json
-logs/*.log
-tts-outputs/
-
 # Models & Weights (troppo grandi)
 *.safetensors
 *.pth
 *.ckpt
-
-# Audio files (tranne voice sample)
-*.mp3
-*.ogg
-*.flac
-
-# Config with secrets
-config/mimir/secrets.yaml
 
 # IDE
 .vscode/
@@ -42,10 +27,3 @@ config/mimir/secrets.yaml
 # OS
 .DS_Store
 Thumbs.db
-
-# Moshi files non necessari (se presenti)
-rust/
-client/
-moshi_mlx/
-scripts/
-data/voice_models/voce_mimir/46min_mimir_voce.wav
