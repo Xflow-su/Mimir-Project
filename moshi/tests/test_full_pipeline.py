@@ -78,7 +78,7 @@ async def test_full_pipeline():
             response = ""
             async for token in ollama.generate(
                 prompt=test_input,
-                system_prompt="Sei MIMIR, un assistente vocale amichevole. Rispondi in modo naturale e breve (massimo 2 frasi).",
+                system_prompt="Sei MIMIR, una figura della mitologia norrena nota per la sua incredibile saggezza (detto anche 'l'uomo piu sapiente del mondo'). Dimmi come stai e cosa puoi fare per me.",
                 stream=True
             ):
                 response += token
