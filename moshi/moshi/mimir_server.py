@@ -66,8 +66,7 @@ class MimirServer:
         # Prova vari path possibili
         possible_paths = [
             project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav",
-            project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_fixed.wav",
-            project_root / "data" / "voice_models" / "mimir_voice_1hour.wav",
+            project_root / "data" / "voice_models" / "mimir_voice_fixed.wav",
         ]
         
         speaker_wav = None
