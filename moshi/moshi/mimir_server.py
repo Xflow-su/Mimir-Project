@@ -55,24 +55,39 @@ class MimirServer:
             with open(config_path) as f:
                 return yaml.safe_load(f)
         
-        # Config default - FIX: Path assoluto per Windows
+        # Config default - FIX: Path assoluto CORRETTO
         logger.warning("Config non trovato, uso default")
         
-        # Trova path progetto
-        # Nel _load_config(), cambia:
-        project_root = Path(__file__).parent.parent.parent.parent
-        # Debug: stampa il path
-        logger.info(f"DEBUG: Project root: {project_root}")
-        logger.info(f"DEBUG: Checking speaker: {speaker_wav}")
-        speaker_wav = project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav"
+        # FIX: Trova root correttamente
+        # __file__ è in: moshi/moshi/mimir_server.py
+        # Quindi: parent.parent.parent = root progetto
+        project_root = Path(__file__).resolve().parent.parent.parent
         
-        # Verifica che esista
-        if not speaker_wav.exists():
-            logger.warning(f"⚠️ Speaker WAV non trovato: {speaker_wav}")
-            # Prova path alternativo
-            speaker_wav = project_root / "data" / "voice_models" / "mimir_voice_fixed.wav"
-            if speaker_wav.exists():
-                logger.info(f"✅ Usando speaker alternativo: {speaker_wav}")
+        # Prova vari path possibili
+        possible_paths = [
+            project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav",
+            project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_fixed.wav",
+            project_root / "data" / "voice_models" / "mimir_voice_1hour.wav",
+        ]
+        
+        speaker_wav = None
+        for path in possible_paths:
+            logger.debug(f"Provo path: {path}")
+            if path.exists():
+                speaker_wav = path
+                logger.info(f"✅ Speaker WAV trovato: {speaker_wav}")
+                break
+        
+        if not speaker_wav:
+            logger.error("❌ NESSUN file speaker_wav trovato!")
+            logger.error(f"   Root progetto: {project_root}")
+            logger.error(f"   Provati: {[str(p) for p in possible_paths]}")
+            # Lista file disponibili
+            voice_dir = project_root / "data" / "voice_models"
+            if voice_dir.exists():
+                logger.info(f"   File disponibili in {voice_dir}:")
+                for f in voice_dir.rglob("*.wav"):
+                    logger.info(f"     - {f}")
         
         return {
             "whisper": {"model": "medium", "language": "it", "device": "cpu"},
@@ -80,14 +95,13 @@ class MimirServer:
             "xtts": {
                 "device": "cpu",
                 "language": "it",
-                "speaker_wav": str(speaker_wav),  # Path assoluto
-                "use_custom_voice": True
+                "speaker_wav": str(speaker_wav) if speaker_wav else None,
+                "use_custom_voice": speaker_wav is not None
             },
             "personality": {
                 "system_prompt": "Sei MIMIR, un assistente vocale saggio e conciso. Rispondi in modo naturale e breve (max 2-3 frasi)."
             }
         }
-        
     async def initialize(self):
         """Inizializza tutti i componenti della pipeline"""
         logger.info("🔮 Inizializzazione MIMIR Server...")
@@ -315,12 +329,25 @@ class MimirServer:
         
         # Keep running
         try:
-            await asyncio.Event().wait()
-        except KeyboardInterrupt:
-            logger.info("\n🛑 Shutdown richiesto...")
+            stop_event = asyncio.Event()
+            
+            def signal_handler():
+                logger.info("\n🛑 Shutdown richiesto...")
+                stop_event.set()
+            
+            # Registra handler per Ctrl+C
+            import signal
+            loop = asyncio.get_event_loop()
+            loop.add_signal_handler(signal.SIGINT, signal_handler)
+            
+            # Attendi stop
+            await stop_event.wait()
+            
+        except Exception as e:
+            logger.error(f"Errore: {e}")
         finally:
             await runner.cleanup()
-
+            logger.info("✅ Server chiuso")
 
 def main():
     """Entry point"""
