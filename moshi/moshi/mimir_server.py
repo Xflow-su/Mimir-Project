@@ -55,21 +55,35 @@ class MimirServer:
             with open(config_path) as f:
                 return yaml.safe_load(f)
         
-        # Config default
+        # Config default - FIX: Path assoluto per Windows
         logger.warning("Config non trovato, uso default")
+        
+        # Trova path progetto
+        project_root = Path(__file__).parent.parent.parent.parent
+        speaker_wav = project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav"
+        
+        # Verifica che esista
+        if not speaker_wav.exists():
+            logger.warning(f"⚠️ Speaker WAV non trovato: {speaker_wav}")
+            # Prova path alternativo
+            speaker_wav = project_root / "data" / "voice_models" / "mimir_voice_fixed.wav"
+            if speaker_wav.exists():
+                logger.info(f"✅ Usando speaker alternativo: {speaker_wav}")
+        
         return {
             "whisper": {"model": "medium", "language": "it", "device": "cpu"},
             "ollama": {"model": "llama3.2:3b", "base_url": "http://localhost:11434"},
             "xtts": {
                 "device": "cpu",
                 "language": "it",
-                "speaker_wav": "./data/voice_models/voce_mimir/mimir_voice_master.wav"
+                "speaker_wav": str(speaker_wav),  # Path assoluto
+                "use_custom_voice": True
             },
             "personality": {
                 "system_prompt": "Sei MIMIR, un assistente vocale saggio e conciso. Rispondi in modo naturale e breve (max 2-3 frasi)."
             }
         }
-    
+        
     async def initialize(self):
         """Inizializza tutti i componenti della pipeline"""
         logger.info("🔮 Inizializzazione MIMIR Server...")
