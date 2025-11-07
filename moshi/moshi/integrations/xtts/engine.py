@@ -68,7 +68,23 @@ class XTTSEngine:
         # Stats
         self._synthesis_count = 0
         self._total_characters = 0
-        
+
+        # 🔍 Cerca automaticamente la voce mimir_voice_master.wav
+        if not self.config.speaker_wav:
+            possible_paths = [
+                Path(__file__).parent / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav",
+                Path(__file__).parent.parent.parent / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav",
+                Path.cwd() / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav"
+            ]
+            for p in possible_paths:
+                if p.exists():
+                    self.config.speaker_wav = str(p.resolve())
+                    self.config.use_custom_voice = True
+                    logger.info(f"✅ File voce trovato automaticamente: {self.config.speaker_wav}")
+                    break
+            else:
+                logger.warning("⚠️ File mimir_voice_master.wav non trovato automaticamente. Uso voce di default.")
+    
     def load_model(self):
         """Carica modello XTTS v2"""
         if self.tts is not None:
