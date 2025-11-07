@@ -1,6 +1,6 @@
 """
 Mimir Server - WebSocket Server per conversazione vocale real-time
-Basato su architettura Moshi ma con pipeline Mimir
+Integra: Whisper (ASR) → Ollama (LLM) → XTTS (TTS)
 """
 
 import argparse
@@ -10,208 +10,290 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 import numpy as np
-import sphn
 import yaml
 
-from .mimir_orchestrator import MimirOrchestrator, MimirConfig
-from .client_utils import log
+# Import integrations
+from moshi.moshi.integrations.whisper.engine import WhisperEngine, WhisperConfig
+from moshi.moshi.integrations.ollama.client import OllamaClient
+from moshi.moshi.integrations.xtts.engine import XTTSEngine, XTTSConfig
 
 logger = logging.getLogger(__name__)
 
 
 class MimirServer:
     """
-    Server WebSocket per Mimir
+    Server WebSocket per conversazioni vocali con MIMIR
     
-    Gestisce:
-    - Connessioni WebSocket client
-    - Streaming audio bidirezionale
-    - Pipeline Mimir completa
+    Pipeline:
+    1. Client invia audio → Whisper (ASR)
+    2. Testo → Ollama (LLM)
+    3. Risposta → XTTS (TTS)
+    4. Audio → Client
     """
     
-    def __init__(self, config: MimirConfig, host: str = "0.0.0.0", port: int = 8998):
-        self.config = config
+    def __init__(self, config_path: str = None, host: str = "0.0.0.0", port: int = 8998):
         self.host = host
         self.port = port
+        self.config = self._load_config(config_path)
         
-        # Orchestrator Mimir (uno per server, condiviso tra sessioni)
-        self.mimir: Optional[MimirOrchestrator] = None
+        # Componenti pipeline
+        self.whisper: WhisperEngine = None
+        self.ollama: OllamaClient = None
+        self.xtts: XTTSEngine = None
         
         # Web app
         self.app = web.Application()
         self.setup_routes()
         
-    def setup_routes(self):
-        """Setup routes WebSocket"""
-        self.app.router.add_get("/api/chat", self.handle_chat)
-        self.app.router.add_get("/health", self.handle_health)
+        # Stats
+        self.active_connections = 0
+        self.total_requests = 0
         
-        # Serve static files (web UI) se disponibili
-        client_dir = Path(__file__).parent.parent.parent / "client" / "dist"
-        if client_dir.exists():
-            self.app.router.add_static("/", client_dir, name="static")
-            logger.info(f"Serving web UI from: {client_dir}")
+    def _load_config(self, config_path: str = None) -> dict:
+        """Carica configurazione da YAML"""
+        if config_path and Path(config_path).exists():
+            with open(config_path) as f:
+                return yaml.safe_load(f)
+        
+        # Config default
+        logger.warning("Config non trovato, uso default")
+        return {
+            "whisper": {"model": "medium", "language": "it", "device": "cpu"},
+            "ollama": {"model": "llama3.2:3b", "base_url": "http://localhost:11434"},
+            "xtts": {
+                "device": "cpu",
+                "language": "it",
+                "speaker_wav": "./data/voice_models/voce_mimir/mimir_voice_master.wav"
+            },
+            "personality": {
+                "system_prompt": "Sei MIMIR, un assistente vocale saggio e conciso. Rispondi in modo naturale e breve (max 2-3 frasi)."
+            }
+        }
+    
+    async def initialize(self):
+        """Inizializza tutti i componenti della pipeline"""
+        logger.info("🔮 Inizializzazione MIMIR Server...")
+        
+        # 1. Whisper ASR
+        logger.info("  📝 Caricamento Whisper...")
+        whisper_config = WhisperConfig(
+            model_size=self.config["whisper"]["model"],
+            language=self.config["whisper"]["language"],
+            device=self.config["whisper"]["device"]
+        )
+        self.whisper = WhisperEngine(whisper_config)
+        self.whisper.load_model()
+        logger.info("  ✅ Whisper pronto")
+        
+        # 2. Ollama LLM
+        logger.info("  🧠 Connessione Ollama...")
+        # OllamaClient usa context manager, lo inizializzeremo per richiesta
+        logger.info("  ✅ Ollama configurato")
+        
+        # 3. XTTS TTS
+        logger.info("  🔊 Caricamento XTTS...")
+        xtts_config = XTTSConfig(
+            device=self.config["xtts"]["device"],
+            language=self.config["xtts"]["language"],
+            speaker_wav=self.config["xtts"].get("speaker_wav"),
+            use_custom_voice=True
+        )
+        self.xtts = XTTSEngine(xtts_config)
+        self.xtts.load_model()
+        logger.info("  ✅ XTTS pronto")
+        
+        logger.info("✅ MIMIR Server pronto!")
+    
+    def setup_routes(self):
+        """Setup route WebSocket"""
+        self.app.router.add_get("/", self.handle_index)
+        self.app.router.add_get("/health", self.handle_health)
+        self.app.router.add_get("/api/chat", self.handle_chat)
+        self.app.router.add_get("/stats", self.handle_stats)
+    
+    async def handle_index(self, request):
+        """Pagina index"""
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>MIMIR Server</title>
+            <style>
+                body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+                h1 { color: #2c3e50; }
+                .status { padding: 10px; background: #27ae60; color: white; border-radius: 5px; }
+                .endpoint { background: #ecf0f1; padding: 10px; margin: 10px 0; border-radius: 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>🔮 MIMIR Server</h1>
+            <div class="status">✅ Server Attivo</div>
+            <h2>Endpoints Disponibili:</h2>
+            <div class="endpoint"><b>GET /health</b> - Health check</div>
+            <div class="endpoint"><b>GET /stats</b> - Server statistics</div>
+            <div class="endpoint"><b>WS /api/chat</b> - WebSocket per conversazioni vocali</div>
+            <h2>Status:</h2>
+            <p>Connessioni attive: <b id="connections">0</b></p>
+            <p>Richieste totali: <b id="requests">0</b></p>
+        </body>
+        </html>
+        """
+        return web.Response(text=html, content_type="text/html")
     
     async def handle_health(self, request):
         """Health check endpoint"""
-        if self.mimir and self.mimir._initialized:
-            return web.json_response({"status": "ok", "mimir": "ready"})
-        return web.json_response({"status": "initializing"}, status=503)
+        health = {
+            "status": "ok",
+            "components": {
+                "whisper": self.whisper is not None,
+                "xtts": self.xtts is not None,
+                "ollama": True  # Configurato
+            },
+            "active_connections": self.active_connections
+        }
+        return web.json_response(health)
+    
+    async def handle_stats(self, request):
+        """Statistics endpoint"""
+        stats = {
+            "active_connections": self.active_connections,
+            "total_requests": self.total_requests,
+            "whisper_stats": self.whisper.get_stats() if self.whisper else {},
+            "xtts_stats": self.xtts.get_stats() if self.xtts else {}
+        }
+        return web.json_response(stats)
     
     async def handle_chat(self, request):
         """
-        WebSocket handler per chat vocale
+        WebSocket handler per conversazioni vocali
         
         Protocol:
-        - Client invia: [0x01][opus_audio_data]
-        - Server invia: [0x01][opus_audio_data] (risposta vocale)
+        - Client → Server: JSON {"type": "text", "data": "..."}
+        - Server → Client: JSON {"type": "text"|"audio", "data": "..."}
         """
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         
-        logger.info("🔗 Nuova connessione WebSocket")
-        
-        # Opus codec per streaming
-        opus_reader = sphn.OpusStreamReader(24000)  # 24kHz
-        opus_writer = sphn.OpusStreamWriter(22050)  # 22050Hz (XTTS output)
-        
-        # Audio buffer per accumulo
-        audio_buffer = []
-        buffer_duration_target = 3.0  # secondi di audio prima di processare
-        
-        async def send_loop():
-            """Invia audio generato al client"""
-            try:
-                while True:
-                    await asyncio.sleep(0.01)
-                    
-                    # Leggi audio da opus writer
-                    opus_data = opus_writer.read_bytes()
-                    if len(opus_data) > 0:
-                        await ws.send_bytes(b"\x01" + opus_data)
-                        
-            except Exception as e:
-                logger.error(f"Send loop error: {e}")
-        
-        async def recv_loop():
-            """Ricevi audio dal client"""
-            nonlocal audio_buffer
-            
-            try:
-                async for message in ws:
-                    if message.type == aiohttp.WSMsgType.ERROR:
-                        logger.error(f"WebSocket error: {ws.exception()}")
-                        break
-                    elif message.type == aiohttp.WSMsgType.CLOSED:
-                        logger.info("WebSocket closed by client")
-                        break
-                    elif message.type != aiohttp.WSMsgType.BINARY:
-                        logger.warning(f"Unexpected message type: {message.type}")
-                        continue
-                    
-                    data = message.data
-                    if not isinstance(data, bytes) or len(data) == 0:
-                        continue
-                    
-                    kind = data[0]
-                    
-                    if kind == 1:  # Audio data
-                        payload = data[1:]
-                        opus_reader.append_bytes(payload)
-                        
-                        # Decodifica Opus → PCM
-                        pcm = opus_reader.read_pcm()
-                        if len(pcm) > 0:
-                            audio_buffer.append(pcm)
-                            
-                            # Calcola durata buffer
-                            total_samples = sum(len(chunk) for chunk in audio_buffer)
-                            buffer_duration = total_samples / 24000
-                            
-                            # Se abbiamo abbastanza audio, processa
-                            if buffer_duration >= buffer_duration_target:
-                                await process_audio_buffer(audio_buffer)
-                                audio_buffer = []
-                                
-            except Exception as e:
-                logger.error(f"Recv loop error: {e}")
-        
-        async def process_audio_buffer(buffer_chunks):
-            """Processa buffer audio accumulato"""
-            try:
-                # Concatena tutti i chunk
-                audio_full = np.concatenate(buffer_chunks)
-                
-                logger.info(f"Processing {len(audio_full)/24000:.2f}s audio...")
-                
-                # Resample 24kHz → 16kHz per Whisper
-                audio_16k = resample_audio(audio_full, 24000, 16000)
-                
-                # Pipeline Mimir
-                # 1. Whisper ASR
-                user_text = await self.mimir.process_audio_chunk(audio_16k)
-                
-                if user_text:
-                    logger.info(f"👤 User: {user_text}")
-                    
-                    # 2. Ollama LLM
-                    response_text = await self.mimir.generate_response(user_text)
-                    logger.info(f"🧙 Mimir: {response_text}")
-                    
-                    # 3. XTTS TTS
-                    response_audio = await self.mimir.synthesize_speech(response_text)
-                    
-                    if response_audio is not None:
-                        # Encode audio → Opus
-                        # XTTS output è 22050Hz, opus_writer è configurato per questo
-                        opus_writer.append_pcm(response_audio)
-                        
-                        logger.info(f"🔊 Audio response sent ({len(response_audio)/22050:.2f}s)")
-                
-            except Exception as e:
-                logger.error(f"Process audio error: {e}")
-        
-        def resample_audio(audio, from_sr, to_sr):
-            """Resample audio"""
-            if from_sr == to_sr:
-                return audio
-            
-            duration = len(audio) / from_sr
-            new_length = int(duration * to_sr)
-            indices = np.linspace(0, len(audio) - 1, new_length)
-            return np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
-        
-        # Start loops
-        send_task = asyncio.create_task(send_loop())
-        recv_task = asyncio.create_task(recv_loop())
+        self.active_connections += 1
+        logger.info(f"🔗 Nuova connessione WebSocket (totale: {self.active_connections})")
         
         try:
-            await asyncio.gather(send_task, recv_task)
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    await self._process_message(ws, msg.data)
+                    
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    logger.error(f"WebSocket error: {ws.exception()}")
+                    
         except Exception as e:
-            logger.error(f"WebSocket handler error: {e}")
+            logger.error(f"Errore gestione WebSocket: {e}")
+            
         finally:
-            logger.info("WebSocket disconnected")
-            send_task.cancel()
-            recv_task.cancel()
+            self.active_connections -= 1
+            logger.info(f"❌ Connessione chiusa (attive: {self.active_connections})")
         
         return ws
     
+    async def _process_message(self, ws: web.WebSocketResponse, message: str):
+        """Processa messaggio dal client"""
+        try:
+            import json
+            data = json.loads(message)
+            msg_type = data.get("type")
+            content = data.get("data")
+            
+            if msg_type == "text":
+                # Input testuale diretto
+                await self._handle_text_input(ws, content)
+            
+            elif msg_type == "ping":
+                # Ping/pong per keep-alive
+                await ws.send_json({"type": "pong", "data": "ok"})
+            
+            else:
+                logger.warning(f"Tipo messaggio sconosciuto: {msg_type}")
+                
+        except json.JSONDecodeError:
+            logger.error("Messaggio JSON malformato")
+        except Exception as e:
+            logger.error(f"Errore processing: {e}")
+            await ws.send_json({"type": "error", "data": str(e)})
+    
+    async def _handle_text_input(self, ws: web.WebSocketResponse, user_text: str):
+        """
+        Gestisce input testuale:
+        1. Testo → Ollama (LLM)
+        2. Risposta → XTTS (TTS)
+        3. Audio → Client
+        """
+        self.total_requests += 1
+        logger.info(f"👤 Input: {user_text}")
+        
+        # Invia ACK
+        await ws.send_json({"type": "ack", "data": "Processing..."})
+        
+        try:
+            # 1. Genera risposta con Ollama
+            response_text = ""
+            async with OllamaClient() as ollama:
+                await ws.send_json({"type": "status", "data": "Thinking..."})
+                
+                async for token in ollama.generate(
+                    prompt=user_text,
+                    system_prompt=self.config["personality"]["system_prompt"]
+                ):
+                    response_text += token
+            
+            logger.info(f"🧙 Risposta: {response_text[:100]}...")
+            
+            # Invia risposta testuale
+            await ws.send_json({"type": "text", "data": response_text})
+            
+            # 2. Sintetizza audio con XTTS
+            await ws.send_json({"type": "status", "data": "Generating audio..."})
+            
+            audio = await self.xtts.synthesize(response_text)
+            
+            if audio is not None:
+                # Converti audio in base64 per invio
+                import base64
+                audio_bytes = (audio * 32767).astype(np.int16).tobytes()
+                audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                
+                await ws.send_json({
+                    "type": "audio",
+                    "data": audio_b64,
+                    "sample_rate": self.xtts.config.sample_rate
+                })
+                
+                logger.info("✅ Audio inviato al client")
+            else:
+                logger.warning("⚠️ Sintesi audio fallita")
+            
+        except Exception as e:
+            logger.error(f"Errore pipeline: {e}")
+            await ws.send_json({"type": "error", "data": str(e)})
+    
     async def start(self):
-        """Avvia server"""
-        logger.info("🔮 Inizializzazione Mimir Server...")
+        """Avvia il server"""
+        await self.initialize()
         
-        # Init Mimir orchestrator
-        self.mimir = MimirOrchestrator(self.config)
-        await self.mimir.initialize()
-        
-        # Start web server
         runner = web.AppRunner(self.app)
         await runner.setup()
         site = web.TCPSite(runner, self.host, self.port)
         await site.start()
         
-        logger.info(f"✅ Mimir Server attivo su http://{self.host}:{self.port}")
-        logger.info(f"📡 WebSocket endpoint: ws://{self.host}:{self.port}/api/chat")
+        logger.info(f"")
+        logger.info(f"{'='*60}")
+        logger.info(f"🔮 MIMIR Server Attivo")
+        logger.info(f"{'='*60}")
+        logger.info(f"📡 URL:     http://{self.host}:{self.port}")
+        logger.info(f"🔌 WebSocket: ws://{self.host}:{self.port}/api/chat")
+        logger.info(f"❤️  Health:  http://{self.host}:{self.port}/health")
+        logger.info(f"📊 Stats:   http://{self.host}:{self.port}/stats")
+        logger.info(f"{'='*60}")
+        logger.info(f"Premi Ctrl+C per fermare il server")
+        logger.info(f"")
         
         # Keep running
         try:
@@ -219,54 +301,13 @@ class MimirServer:
         except KeyboardInterrupt:
             logger.info("\n🛑 Shutdown richiesto...")
         finally:
-            await self.mimir.shutdown()
             await runner.cleanup()
-
-
-# ========================================
-# CLI
-# ========================================
-
-def load_config(config_file: str) -> MimirConfig:
-    """Carica config da YAML"""
-    config_path = Path(config_file)
-    
-    if not config_path.exists():
-        logger.warning(f"Config non trovato: {config_file}, uso default")
-        return MimirConfig()
-    
-    with open(config_path) as f:
-        data = yaml.safe_load(f)
-    
-    # Parse config
-    config = MimirConfig()
-    
-    if "whisper" in data:
-        config.whisper_model = data["whisper"].get("model", "medium")
-        config.whisper_language = data["whisper"].get("language", "it")
-        config.whisper_device = data["whisper"].get("device", "cpu")
-    
-    if "ollama" in data:
-        config.ollama_model = data["ollama"].get("model", "llama3.2:3b")
-        config.ollama_base_url = data["ollama"].get("base_url", "http://localhost:11434")
-        config.ollama_temperature = data["ollama"].get("temperature", 0.75)
-    
-    if "xtts" in data:
-        config.xtts_device = data["xtts"].get("device", "cpu")
-        config.xtts_language = data["xtts"].get("language", "it")
-        config.xtts_speaker_wav = data["xtts"].get("speaker_wav", "./data/voice_models/mimir_voice_fixed.wav")
-        config.xtts_use_custom_voice = data["xtts"].get("use_custom_voice", True)
-    
-    if "personality" in data:
-        config.system_prompt = data["personality"].get("system_prompt")
-    
-    return config
 
 
 def main():
     """Entry point"""
-    parser = argparse.ArgumentParser(description="Mimir Server - Voice Assistant")
-    parser.add_argument("--config", type=str, default="config/mimir/settings.yaml",
+    parser = argparse.ArgumentParser(description="MIMIR Server - Voice Assistant")
+    parser.add_argument("--config", type=str, default="config/mimir/mimir_server.yaml",
                        help="Path al file configurazione")
     parser.add_argument("--host", type=str, default="0.0.0.0",
                        help="Host server")
@@ -284,11 +325,8 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Load config
-    config = load_config(args.config)
-    
-    # Create server
-    server = MimirServer(config, host=args.host, port=args.port)
+    # Create e avvia server
+    server = MimirServer(config_path=args.config, host=args.host, port=args.port)
     
     # Run
     asyncio.run(server.start())
