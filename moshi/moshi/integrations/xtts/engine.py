@@ -338,7 +338,7 @@ async def test_xtts():
         language="it",
         device="cpu",
         use_custom_voice=True,  # ← ABILITATO
-        speaker_wav="./data/voice_models/mimir_voice_1hour.wav"  # ← PATH FILE
+        speaker_wav="./data/voice_models/voce_mimir/mimir_voice_master.wav"  # ← PATH FILE
     )
     
     engine = XTTSEngine(config)
@@ -378,7 +378,7 @@ async def test_streaming():
         language="it",
         device="cpu",
         use_custom_voice=True,  # ← ABILITATO
-        speaker_wav="./data/voice_models/mimir_voice_1hour.wav"  # ← PATH FILE
+        speaker_wav="./data/voice_models/voce_mimir/mimir_voice_master.wav"  # ← PATH FILE
     )
     
     engine = XTTSEngine(config)
