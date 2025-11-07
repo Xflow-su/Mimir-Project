@@ -17,6 +17,8 @@ from moshi.moshi.integrations.whisper.engine import WhisperEngine, WhisperConfig
 from moshi.moshi.integrations.ollama.client import OllamaClient
 from moshi.moshi.integrations.xtts.engine import XTTSEngine, XTTSConfig
 
+logging.basicConfig(level=logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 
