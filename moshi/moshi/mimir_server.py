@@ -59,7 +59,11 @@ class MimirServer:
         logger.warning("Config non trovato, uso default")
         
         # Trova path progetto
+        # Nel _load_config(), cambia:
         project_root = Path(__file__).parent.parent.parent.parent
+        # Debug: stampa il path
+        logger.info(f"DEBUG: Project root: {project_root}")
+        logger.info(f"DEBUG: Checking speaker: {speaker_wav}")
         speaker_wav = project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav"
         
         # Verifica che esista
