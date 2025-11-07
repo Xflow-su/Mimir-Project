@@ -125,6 +125,8 @@ class MimirServer:
         
         # 3. XTTS TTS
         logger.info("  🔊 Caricamento XTTS...")
+        
+        project_root = Path(__file__).resolve().parent.parent.parent
         xtts_config = XTTSConfig(
             device=self.config["xtts"]["device"],
             language=self.config["xtts"]["language"],
