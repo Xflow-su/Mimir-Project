@@ -66,8 +66,10 @@ class MimirServer:
         # Prova vari path possibili
         possible_paths = [
             project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav",
-            project_root / "data" / "voice_models" / "mimir_voice_fixed.wav",
+            Path(__file__).resolve().parent.parent.parent / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav",
+            Path.cwd() / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav"
         ]
+
         
         speaker_wav = None
         for path in possible_paths:
@@ -126,7 +128,7 @@ class MimirServer:
         xtts_config = XTTSConfig(
             device=self.config["xtts"]["device"],
             language=self.config["xtts"]["language"],
-            speaker_wav=self.config["xtts"].get("speaker_wav"),
+            speaker_wav=str(project_root / "data" / "voice_models" / "voce_mimir" / "mimir_voice_master.wav"),
             use_custom_voice=True
         )
         self.xtts = XTTSEngine(xtts_config)
