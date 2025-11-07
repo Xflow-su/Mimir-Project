@@ -141,6 +141,34 @@ Mimir-Project/
 | **Client CLI** | `mimir_client.py` | ⚠️ WIP | Development in corso |
 | **Orchestrator** | `mimir_orchestrator.py` | ⚠️ WIP | Integration pipeline |
 
+### ✅ Server WebSocket (NUOVO - 2024-11-05)
+
+| Componente | File | Stato | Funzionalità |
+|------------|------|-------|--------------|
+| **Server HTTP** | `mimir_server.py` | ✅ OK | Index, Health, Stats |
+| **WebSocket Chat** | `mimir_server.py` | ✅ OK | Conversazioni real-time |
+| **Pipeline Integration** | `mimir_server.py` | ✅ OK | Whisper + Ollama + XTTS |
+| **Test Client** | `tests/test_server.py` | ✅ OK | Test automatizzato |
+
+**Endpoints Disponibili:**
+- `GET /` - Pagina index con info
+- `GET /health` - Health check JSON
+- `GET /stats` - Statistiche server
+- `WS /api/chat` - WebSocket per conversazioni
+
+**Protocollo WebSocket:**
+```json
+// Client → Server
+{"type": "text", "data": "Messaggio utente"}
+{"type": "ping", "data": "test"}
+
+// Server → Client
+{"type": "ack", "data": "Processing..."}
+{"type": "status", "data": "Thinking..."}
+{"type": "text", "data": "Risposta AI"}
+{"type": "audio", "data": "base64_audio", "sample_rate": 22050}
+{"type": "error", "data": "Error message"}
+```
 ---
 
 ## 🧪 TEST ESEGUITI E RISULTATI
@@ -215,6 +243,12 @@ python moshi/tests/test_full_pipeline.py
 
 ## 🎯 PROSSIMI STEP
 
+### 🔥 In Corso
+| Step | Descrizione | Status |
+|------|-------------|--------|
+| **Client CLI** | CLI interattivo per conversazioni | ⏳ Prossimo |
+| **Audio Streaming** | Invio audio diretto (non solo testo) | ⏳ TODO |
+
 ### 🔥 Alta Priorità
 
 | Step | Descrizione | Status |
@@ -229,6 +263,7 @@ python moshi/tests/test_full_pipeline.py
 | Step | Descrizione | Status |
 |------|-------------|--------|
 | **Memoria Conversazioni** | Implementare SQLite per storage | ⏳ TODO |
+| **Web UI** | Interfaccia web moderna | ⏳ TODO |
 | **Config Avanzata** | Personalizzazione parametri via YAML | ⏳ TODO |
 | **Logging Strutturato** | Sistema di log centralizzato | ⏳ TODO |
 
