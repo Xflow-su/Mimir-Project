@@ -175,9 +175,9 @@ class XTTSEngine:
             # Sintesi (blocking - esegui in executor)
             loop = asyncio.get_event_loop()
             
-            if self.config.use_custom_voice and self._speaker_wav_loaded:
-                # Voice cloning con file speaker - Approccio corretto per XTTS v2
-                logger.info(f"Voice cloning con: {self.config.speaker_wav}")
+            # FIX: Usa sempre speaker_wav se disponibile
+            if self.config.use_custom_voice and self.config.speaker_wav:
+                logger.debug(f"Voice cloning con: {self.config.speaker_wav}")
                 
                 wav = await loop.run_in_executor(
                     None,
@@ -185,17 +185,13 @@ class XTTSEngine:
                         text=text,
                         language=self.config.language,
                         speaker_wav=self.config.speaker_wav,
-                        # XTTS non accetta questi parametri in voice cloning mode
-                        # temperature=self.config.temperature,
-                        # length_penalty=self.config.length_penalty,
                     )
                 )
             else:
-                # Prova con speaker di default se multi-speaker
+                # Fallback: usa primo speaker disponibile o genera errore chiaro
                 speakers = self.tts.speakers if hasattr(self.tts, 'speakers') else []
                 
                 if speakers and len(speakers) > 0:
-                    # Usa primo speaker disponibile
                     logger.info(f"Usando speaker: {speakers[0]}")
                     wav = await loop.run_in_executor(
                         None,
@@ -206,14 +202,10 @@ class XTTSEngine:
                         )
                     )
                 else:
-                    # Ultimo tentativo: sintesi senza speaker
-                    logger.warning("Tentativo sintesi senza speaker specificato")
-                    wav = await loop.run_in_executor(
-                        None,
-                        lambda: self.tts.tts(
-                            text=text,
-                            language=self.config.language
-                        )
+                    # NUOVO: Errore più chiaro
+                    raise RuntimeError(
+                        "Modello multi-speaker ma nessuno speaker configurato. "
+                        "Configura 'speaker_wav' in XTTSConfig o usa un modello single-speaker."
                     )
             
             elapsed = time.time() - start
