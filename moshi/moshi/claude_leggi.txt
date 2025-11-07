@@ -1,3 +1,10 @@
+attualmente sono andato avanti creando/modificando:
+moshi/moshi/mimir_server.py
+moshi/tests/test_server.py
+moshi/moshi/integrations/xtts/engine.py
+moshi/moshi/mimir_server.py
+test_xtts_speaker.py
+invece questi sono i problemi attuali che ho riscontrato e che sono da fixare
 PROBLEMA 1:
 2025-11-07 09:41:15,747 - __main__ - INFO -   ✅ XTTS pronto
 2025-11-07 09:41:15,747 - __main__ - INFO - ✅ MIMIR Server pronto!
@@ -50,3 +57,4 @@ Speaker WAV: C:\Users\minecraft\Desktop\MIMIR\data\voice_models\voce_mimir\mimir
 Esiste: False
 ❌ File non trovato!
 File in C:\Users\minecraft\Desktop\MIMIR\data\voice_models:
+ATTENZIONE: ogni volta che finisci di fare cioà che io ti richiedo, aggiorna il file CLAUDE.md aggiungendo o modificando solo dei pezzi, non devi riscrivere tutto il file
