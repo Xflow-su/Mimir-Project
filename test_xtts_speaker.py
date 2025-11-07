@@ -1,5 +1,6 @@
 # test_xtts_speaker.py
 from pathlib import Path
+from moshi.moshi.integrations.xtts.engine import XTTSEngine, XTTSConfig
 
 # FIX: parent solo una volta (il file è nella root)
 project_root = Path(__file__).parent  # ← Era .parent.parent
