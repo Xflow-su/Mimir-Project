@@ -11,6 +11,7 @@ import aiohttp
 from aiohttp import web
 import numpy as np
 import yaml
+import traceback
 
 # Import integrations
 from moshi.moshi.integrations.whisper.engine import WhisperEngine, WhisperConfig
@@ -350,9 +351,11 @@ class MimirServer:
             
         except Exception as e:
             logger.error(f"Errore: {e}")
+            traceback.print_exc()
         finally:
             await runner.cleanup()
             logger.info("✅ Server chiuso")
+
 
 def main():
     """Entry point"""
