@@ -264,7 +264,14 @@ class MimirTestClient:
             
             # Genera 3 secondi di silenzio (per trigger server)
             silence = np.zeros(3 * 24000, dtype=np.float32)
-            opus_writer.append_pcm(silence)
+            frame_size = 1920  # compatibile con Opus 24kHz
+
+            for i in range(0, len(silence), frame_size):
+                chunk = silence[i:i+frame_size]
+                if len(chunk) < frame_size:
+                    chunk = np.pad(chunk, (0, frame_size - len(chunk)))
+                opus_writer.append_pcm(chunk)
+
             
             audio_data = opus_writer.read_bytes()
             await ws.send_bytes(b"\x01" + audio_data)
