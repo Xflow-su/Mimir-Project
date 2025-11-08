@@ -219,10 +219,24 @@ class MimirServer:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     await self._process_message(ws, msg.data)
-                    
+            
+                elif msg.type == aiohttp.WSMsgType.BINARY:
+                    data = msg.data
+                    kind = data[0] if len(data) > 0 else None
+            
+                    if kind == 1:
+                        audio_data = data[1:]
+                        logger.info(f"🎧 Audio ricevuto: {len(audio_data)} bytes")
+                        # TODO: qui puoi passare l'audio a Whisper o salvarlo su file
+                        # esempio temporaneo:
+                        # with open("received_audio.opus", "ab") as f:
+                        #     f.write(audio_data)
+                    else:
+                        logger.warning(f"Tipo messaggio sconosciuto: {kind}")
+            
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     logger.error(f"WebSocket error: {ws.exception()}")
-                    
+
         except Exception as e:
             logger.error(f"Errore gestione WebSocket: {e}")
             
