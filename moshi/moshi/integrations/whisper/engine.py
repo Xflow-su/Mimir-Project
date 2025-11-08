@@ -13,6 +13,8 @@ import torch
 import whisper
 from queue import Queue
 import threading
+import soundfile as sf
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +256,28 @@ class WhisperEngine:
             "model_size": self.config.model_size,
             "device": str(self.device)
         }
+        
+    def transcribe_bytes(self, audio_bytes: bytes) -> str:
+        """
+        Trascrive audio in formato bytes (es. da WebSocket) usando Whisper.
+        """
+        try:
+            # Decodifica bytes → array numpy
+            audio, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+            
+            # Whisper si aspetta audio float32 a 16 kHz
+            if sr != 16000:
+                import librosa
+                audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+            
+            # Esegui trascrizione
+            result = self.model.transcribe(audio, language=self.config.language)
+            return result["text"].strip()
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise RuntimeError(f"Errore in transcribe_bytes: {e}")
 
 
 # ========================================
